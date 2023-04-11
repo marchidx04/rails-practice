@@ -2,7 +2,14 @@
 
 ## Rails
 
-> Ruby on Rails는 Ruby 언어로 작성된 오픈소스로 강력하고 탄탄한 웹 어플리케이션을 빠르게 개발할 수 있게 만들어주는 웹 프레임워크    
+> Ruby on Rails는 Ruby 언어로 작성된 오픈소스로 강력하고 탄탄한 웹 어플리케이션을 빠르게 개발할 수 있게 만들어주는 웹 프레임워크   
+
+### 프레임워크란?
+
+- 정형화 되어있는 뼈대, 구조
+- 소프트웨어의 구체적인 부분에 해당하는 설계와 구현을 재사용할 수 있게끔 일련의 협업화된 형태로 클래스를 제공하는 것
+- 프로그램의 뼈대가 되는 기반 코드와 설정이 이미 존재하여 그 기반을 토대로 개발자가 원하는 기능을 추가할 수 있는 라이브러리가 통합된
+- 프로그램이 정상적으로 동작하기 위해 존재하는 가이드라인
 
 ### 특징
 
@@ -24,6 +31,7 @@
 - `Convention over Configuration`
 - `CoC/Rails`는 최선의 방법으로 일을 처리하게 해주는 디폴트/소프트웨어 디자인 패러다임이다.
 - 끊임없는 컴퓨터 구성 파일을 설정하는 일보다 더 많은 시간을 투자할 수 있도록 개발자가 내려야할 수 많은 결정들을 줄여준다.
+  - Rails에서 미리 제공하는 규칙을 지키며 개발하면, 개발자는 정말 필요한 개발 작업에만 집중할 수 있음
   - 하지만 구조를 이루는 요소 각각은 저마다 알맞는 역할을 수행하기 위해 준비되기 때문에 파일 구조가 복잡하다는 단점이 있다.
 
 ### DRY
@@ -177,7 +185,7 @@ end
 
 ## Scaffold
 
-> https://velog.io/@y_dragonrise/Rails-Scaffold
+> https://velog.io/@y_dragonrise/Rails-Scaffold     
 > 뼈대, 기반이라는 뜻을 가지고 있으며, 이 뜻에 걸맞게 기본 기능들을 갖춘 프로젝트의 뼈대를 만들어 준다.   
 > 기존에 작성했던 CRUD 코드보다 더 다양한 기능을 사용할 수 있는 코드를 완성할 수 있다.
 
@@ -218,7 +226,7 @@ end
 
 ## Migration
 
-> https://velog.io/@khy226/Rails-%EB%A7%88%EC%9D%B4%EA%B7%B8%EB%A0%88%EC%9D%B4%EC%85%98-%EC%95%8C%EC%95%84%EB%B3%B4%EA%B8%B0
+> https://velog.io/@khy226/Rails-%EB%A7%88%EC%9D%B4%EA%B7%B8%EB%A0%88%EC%9D%B4%EC%85%98-%EC%95%8C%EC%95%84%EB%B3%B4%EA%B8%B0     
 > 마이크레이션은 액티브 레코드의 기능으로, 데이터베이스 스키마(구조)를 변경하는 수단이다.   
 > 순수 SQL로 스키마 수정사항을 쓰는 대신, 마이그레이션을 통해 Ruby DSL을 사용하여 테이블에 대한 변경 사항을 작성할 수 있다.     
 >   
@@ -248,6 +256,21 @@ end
 
 마이그레이션 파일을 생성해 기존 테이블에 컬럼을 추가할 수도 있다. 해당 파일에 원하는 definition을 추가해서 컬럼을 추가하거나 변경, 삭제할 수 있다.
 
+#### Migration 컬럼 타입
+
+- string
+- text
+- integer
+- float
+- decimal
+- boolean
+- binary
+- date
+- datetime
+- primary_key
+- time
+- timestamp
+
 #### Migration 'change' 메서드 definition 정리
 
 - `change` 메서드는 마이그레이션에서 가장 자주 사용되는 메서드이다. change 메서드를 사용하면, rollback시 ActiveRecord가 자동으로 이전 버전으로 돌릴 수 있도록 해주며, 많은 작업을 할 수 있다.
@@ -262,23 +285,59 @@ add_foreign_key :table_name_1, :table_name_2
 
 # 참조 추가
 # table에 ref_id 라는 컬럼이 생성됨.
-# options: polymorphic일 때 options
+# options: polymorphic일 때 options에 polymorphic: true줄 수 있음. foreign_key: true, index; true로 외래키나 인덱스 추가 가능
+add_reference :table_name, :ref_name, options={}
+
+# 컬럼 옵션 또는 타입 변경
+change_column :table_name, :column_name, :column_type, :column_options
+
+# 테이블 생성
+create_table :table_name do |t|
+  t.column_type :column_name
+
+  t.timestamps
+end
+
+# 테이블 drop
+drop_table :table_name
+
+# 컬럼 제거
+remove_column :table_name, :column_name, :column_type
+
+# index 제거
+remove_index :table_name, name: :index_name
+
+# 컬럼 이름 변경
+rename_column :table_name, :old_column_name, :new_column_nmae
+
+# 테이블 이름 변경
+rename_table ("old_table_name", "new_table_name")
 ```
 
-### Migration 컬럼 타입
+#### change 대신 up과 down 메서드로 마이그레이션 작성
 
-- string
-- text
-- integer
-- float
-- decimal
-- boolean
-- binary
-- date
-- datetime
-- primary_key
-- time
-- timestamp
+```rb
+class CreateSponsorshipSales < ActiveRecord::Migration[6.1]
+  def up
+    change_table :products do |t|
+      t.change :price, :string
+    end
+  end
+
+  def down
+    change_table :products do |t|
+      t.change :price, :integer
+    end
+  end
+end
+```
+
+- up, down 메서드는 앞서 설명한 `change` 메서드와 달리 `rollback`을 해도 `ActiveRecord`가 자동으로 이전 버전으로 되돌리지 못한다.
+  - 하지만 위처럼 두 메서드를 동시에 사용하면 `change`와 같은 효과를 낸다.
+- `rails db:migrate`를 실행하면 ActiveRecord는 `up` 메서드와 `change` 메서드를 읽는다.
+  - `down` 메서드는 읽지 않는다.
+- 반대로, `rails db:rollback`을 실행하면 ActiveRecord는 `down` 메서드와 `change` 메서드를 읽는다.
+  - `up` 메서드는 읽지 않는다.
 
 ### Migrate 실행
 
