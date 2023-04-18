@@ -356,3 +356,341 @@ rails db:rollback STEP=3
 ```
 
 가장 마지막 마이그레이션을 취소하는 작업이다. `rails db:rollback` 명령어를 실행하면 된다.
+
+## Active Record Association
+
+### Active Record
+
+- `Active Record`는 MVC 패턴 중, M에 해당되는 Rails에서 제공되는 모듈이다.
+- 주로 데이터베이스 로직을 제어하는데 사용한다.
+
+### 고객모델과 주문모델(관계를 선언해주지 않는 경우)
+
+```rb
+class Customer < ActiveRecord::Base
+end
+
+class Order <ActiveRecord::Base
+end
+```
+
+관계를 사용하지 않는 경우 이 모델들의 선언은 위 코드와 같다.    
+그리고 아래 코드처럼 직접 `:customer_id => @customer.id`라는 조건을 추가하여 조회하거나, 삭제해야하는 것을 확인할 수 있다.
+
+#### 새로운 주문 추가
+
+```rb
+@order = Order.create(:order_date => Time.now, :customer_id => @customer.id)
+```
+
+#### 고객 삭제 및 관련 모든 주문 삭제
+
+```rb
+@orders = Order.where(:customer_id => @customer.id)
+@orders.each do |order|
+  order.destory
+end
+@customer.destory
+```
+
+### 고객모델과 주문모델(관계를 선언하는 경우)
+
+```rb
+class Customer < ActiveRecord::Base
+  has_many :orders, :dependent => :destory
+end
+
+class Order < ActiveRecord::Base
+  belongs_to :customer
+end
+```
+
+- 고객과 주문 모델 사시에 관계가 있음을 선언해 줌으로써 일괄처리가 가능하다.    
+- 이렇게 활성 레코드 관계(ActiveRecord Association)을 이용한다면 관계를 선언하지 않은 경우보다 코드 작성하는 것이 쉬워진다.
+- `:dependent => :destory`로 설정하면 Customer 모델의 한 고객을 삭제할 때 Order 모델의 해당 고객과 관련된 정보에 대해서도 `destory` 메서드를 호출하여 삭제한다.
+  - `:delete`으로 설정하면 `destory` 메서드 호출하지 않고 `delete`한다
+- `destory`와 `delete` 차이
+  - 
+
+#### 새로운 주문 추가
+
+```rb
+@order = @customer.orders.create(:order_date => Time.now)
+```
+
+#### 고객 삭제와 관련 모든 주문 삭제
+
+```rb
+@customer.destory
+```
+
+### 관계의 유형들
+
+- belongs_to
+- has_one
+- has_many
+- has_many :through
+- has_one :through
+- has_and_belongs_to_many
+
+레일즈는 위 여섯 가지의 관계형을 지원한다.
+
+#### belongs_to
+
+![image](https://user-images.githubusercontent.com/126429401/232645991-a9ee28b9-ce76-4eb7-920f-fa56a5e937c9.png)
+
+- Order 모델은 Customer 모델에 속하게 된다.    
+- 이 때 하나의 주문이 오직 하나의 고객에만 관련되어 있다면 위와 같은 관계를 선언해야 한다.
+
+#### has_one
+
+![image](https://user-images.githubusercontent.com/126429401/232646198-4870f0bf-0b04-4711-acea-d0217b313581.png)
+
+- 이 관계는 하나의 모델(Supplier)가 다른 모델(Account)을 소유하거나 포함하는 것을 의미한다.
+- 예를 들어, 공급업체마다 하나의 계정을 가지고 있다면, 위와 같은 관계를 선언할 것이다.
+
+#### has_many
+
+![image](https://user-images.githubusercontent.com/126429401/232647816-2c9e124a-ab80-4233-9d00-3924ff48f6d7.png)
+
+- 이 관계는 belongs_to 관계의 반대이다.
+- 이 관계는 다른 모델(Order)을 하나도 가지고 있지 않거나 여러 개 가지고 있을 때 사용할 수 있다.
+- **주의: `has_many B` 관계를 선언하는 경우에 `orders`와 같이 복수형의 이름을 갖게 되는 것을 주목해야 한다.**
+
+#### has_many : through
+
+![image](https://user-images.githubusercontent.com/126429401/232648281-d8f0218e-6633-49a6-9a47-5a89adc75bd8.png)
+
+- `has_many : through` 관계는 다른 모델과의 **다대다 관게**를 설정할 때 사용된다.
+- 이 관계는 다른 복수개의 모델을 제3의 모델(Appointment)를 통해서 가지게 됨을 말한다.
+- 다른 예시 만들기
+  ```
+  학생(students)      수강(enrollments)      과목(courses)
+  ---------           ---------             ---------
+  id                   id                   id
+  학번                 학생_id               과목코드
+  이름                 과목_id               과목명
+  연락처               평점                   ...
+  ...
+  ```
+  ```rb
+  class Student < ActiveRecord::Base
+    has_many :enrollments
+    has_many :courses, :through => enrollments
+  end
+
+  class Enrollment < ActiveRecord::Base
+    belongs_to :student
+    belongs_to :course
+  end
+
+  class Course < ActiveRecord::Base
+    has_many :enrollments
+    has_many :students, through => enrollments
+  end
+  ```
+
+### has_one :through
+
+![image](https://user-images.githubusercontent.com/126429401/232651831-96e35c18-4027-4d8e-b1b5-4f263516bacd.png)
+
+```rb
+class Supplier < ActiveRecord::Base
+  has_one :account
+  has_one :account_history, :through => :account
+end
+
+class Account < ActiveRecord::Base
+  belongs_to :supplier
+  has_one :account_history
+end
+
+class AccountHistory < ActiveRecord::Base
+  belongs_to :account
+end
+```
+
+- `has_one :through` 관계는 또다른 모델과의 1:1 연관을 설정할 때 사용한다.
+- 공급업체가 하나의 계정을 갖고, 각 계정은 계정내역을 가지고 있을 때 위와 같은 모델 관계를 설정할 수 있다.
+
+### has_and_belongs_to_many
+
+![image](https://user-images.githubusercontent.com/126429401/232669364-3ce0c65a-1750-4ba5-97bb-671a01b1ebf3.png)
+
+```rb
+class Assembly < ActiveRecord::Base
+  has_and_belongs_to_many :parts
+end
+
+class Part < ActiveRecord::Base
+  has_and_belongs_to_many :assemblies
+end
+```
+
+- `has_and_belongs_to_many` 관계는 다른 모델과 **다대다 관계** 사이에 그 어떤 모델도 없이 직접 생성한다.
+- 조립품은 많은 부품을 가지고, 한 부품은 여러 조립에 사용된다면, 위와같은 모델 관계를 설정할 수 있다.
+
+## ActiveRecord Query Interface
+
+```rb
+class Client < ActiveRecord::Base
+  has_one :address # Address 모델에 client_id
+  has_many :orders # Order 모델에 client_id
+  has_and_belongs_to_many :roles # Role 모델과 직접적인 다대다 관계
+end
+
+class Address < ActiveRecord::Base
+  belongs_to :client # Client 모델에 속함
+end
+
+class Order < ActiveRecord::Base
+  belongs_to :client, :counter_cache => true # Client 모델에 속함
+end
+
+class Role < ActiveRecord::Base
+  has_and_belongs_to_many :clients # Client 모델과 직접적인 다대다 관계
+end
+```
+
+ActiveRecord는 데이터베이스 상에서 쿼리를 실행하여 대부분의 데이터 베이스(MySQL, PostgreSQL, SQLite 등)와 호환된다. ActiveRecord의 장점 중 하나로, 사용하는 데이터베이스가 달라도, 액티브 레코드 메서드 사용 방식은 **항상 동일**하다.
+
+### 데이터베이스에서 객체 조회
+
+- 데이터베이스에서 객체를 조회하기 위해, 액테브 레코드는 몇가지 메서드를 제공한다.
+  - 각 메서드는 기본 SQL을 사용하지 않고, 데이터베이스에 정확한 쿼리를 수행하기 위해서 인자를 받는다.
+- where
+- select
+- group
+- order
+- limit
+- offset
+- joins
+- includes
+- lock
+- readonly
+- from
+- having
+
+### 단일 객체 검색
+
+```rb
+# 기본키(id) 10을 가지고 client 찾기
+client = Client.find(10) # SELECT * FROM clients WHERE (clients.id = 10)
+# <Client id: 10, first_name: => "Ryan">
+
+# 만약 일치하는 레코드가 없다면, Model.first는 nil을 반환
+client = Client.first # SELECT * FROM clients LIMIT 1
+
+# Modal.last도 일치하는 레코드가 없다면 nil을 반환
+client = Client.last # SELECT * FROM clieitns ORDER BY clents.id DESC LIMIT 1
+```
+
+### 복수 객체 검색
+
+```rb
+# 기본키 1과 0에 해당하는 client 객체 찾기
+client = Client.find(1, 10) # Or even Client.find([1, 10])
+# => [#<Client id: 1, first_name: => "Lifo">, #<Client id: 10, first_name: => "Ryan">]
+# SELECT * FROM clients WHERE (clients.id IN (1, 10))
+```
+
+## 조건
+
+### 순수 문자열 조건
+
+```rb
+Client.where("orders_count = '2'")
+Client.where("first_name LIKE '%#{params[:first_name]}%'")
+```
+
+- 순수한 문자열로 조건을 작성하면 SQL injection exploits(SQL 삽입 취약점 공격)에 취약할 수 있다.
+  
+### Array 조건
+
+```rb
+Client.where("orders_count = ?", params[:orders])
+
+Client.where("orders_count = ? AND locked = ?", params[:orders], false)
+```
+
+- 첫 번째 물음표는 `params[:orders]`의 값으로 대체되고, 두 번째 물음표는 false의 SQL 표현으로대체된다.
+
+#### 인수 안전
+
+```rb
+Client.where("orders_count = ?", params[:orders])
+
+Client.where("order_count = #{params[:orders]}")
+```
+
+- 아래처럼 작성하면 **변수를 조건에 문자열에 직접 넣으면 변수가 있는 그대로 데이터베이스에 전달**된다.
+- 악의적인 의도를 가진 사용자가 데이터베이스를 악용할 수 있는 위험에 처할 수있다.
+
+#### 자리 표시자 조건
+
+```rb
+Client.where("created_at >= :start_date AND created_at <= :end_date",
+  {:start_date => params[:start_date], :end_date => params[:end_date]})
+```
+
+- 배열 조건에서 키/값 해시를 지정할 수 있다.
+
+#### 범위 조건
+
+```rb
+# SELECT "clients".* FROM "clients" WHERE ("clients"."created_at" BETWEEN '2010-09-29' AND '2010-11-30')
+Client.where(:created_at => (params[:start_date].to_date)..(params[:end_date].to_date))
+```
+
+- 특정 기간에 생성된 사용자를 찾는 경우 컨트롤러로부터 두 개의 날짜가 있으면 다음과 같이 범위를 통해 조회할 수 있다.
+
+### 해시 조건
+
+조건 구문의 가독성을 높일 수 있도록 해시 조건을 전달할 수 있다.
+
+#### 평등 조건
+
+```rb
+Client.where(:locked => true)
+
+Client.where('locked' => true)
+```
+
+- 필드 이름은 문자열일 수 있다.
+
+#### 범위 조건
+
+```rb
+# SELECT * FROM clients WHERE (clients.created_at BETWEEN '2008-12-21 00:00:00' AND '2008-12-22 00:00:00')
+Client.where(:created_at => (Time.now.midnight - 1.day)..Time.now.midnight)
+```
+
+- 쿼리를 작성하지 않고 필드에 대한 범위를 전달할 수 있다.
+
+#### 하위 집합 조건
+
+```rb
+# SELECT * FROM clients WHERE (clients.orders_count IN (1,3,5))
+Client.where(:orders_count => [1, 3, 5])
+```
+
+- `IN` 표현식을 사용하여 레코드를 찾으려면 조건 해시에 배열을 전달할 수 있다.
+
+### 특정 분야 선택
+
+```rb
+# SELECT viewable_by, locked FROM clients
+Client.select("viewable_by, locked")
+Client.select("DISTINCT(name)")
+```
+
+- DISTINCT 함수를 사용하여 특정 필드의 고유값당 단일 레코드만 가져오려는 경우에 사용할 수 있다.
+
+### 제한 및 오프셋
+
+```rb
+Client.limit(5).offset(30)
+```
+
+- 최대 5개의 30개 넘김
+
