@@ -88,7 +88,7 @@ rails new rails-project
 ### 2. 컨트롤러 생성
 
 ```bash
-rails g controller post index new create deit 
+rails g controller home index
 ```
 
 - `app/controllers/home_controller.rb` 생성
