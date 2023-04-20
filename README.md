@@ -530,6 +530,247 @@ end
 - `has_and_belongs_to_many` 관계는 다른 모델과 **다대다 관계** 사이에 그 어떤 모델도 없이 직접 생성한다.
 - 조립품은 많은 부품을 가지고, 한 부품은 여러 조립에 사용된다면, 위와같은 모델 관계를 설정할 수 있다.
 
+## Active Record Callbacks
+
+### trigger callbacks
+
+- create(attributes = nil, &block)
+  ```rb
+  # 새로운 단일 객체 생성
+  User.create(first_name: 'Jamie')
+
+  # 배열 형태의 복수 객체 생성
+  User.create([{ first_name: 'Jamie' }, { first_name: 'Jeremy' }])
+
+  # 새로운 단일 객체 생성 및 블록에 다른 속성 설정
+  User.create(first_name: 'Jamie') do |u|
+    u.is_admin = false
+  end
+
+  # 배열 형태의 복수 객체 생성 및 블록에 다른 속성 설정
+  User.create([{ first_name: 'Jamie' }, { first_name: 'Jeremy' }]) do |u|
+    u.is_admin = false
+  end
+  ```
+  - 유효성 검사를 통과할경우 객체(또는 여러 객체)를 생성하여 데이터베이스에 저장한다.
+  - 결과 객체가 데이터베이스에 성공적으로 저장되었는지 여부에 관계없이 결과 객체가 반환된다.
+  - 매개변수는 해시 또는 해시 배열일 수 있다.
+    - 이렇나 해시는 생성할 객체의 특성을 정한다.
+- create!
+- destroy(id)
+  ```rb
+  # DELETE FROM todos WHERE id = 1
+  Todo.destroy(1)
+
+  # DELETE FROM todos WHERE id in (1, 2, 3)
+  Todo.destroy([1, 2, 3])
+  ```
+  - id는 Integer나 Array of Integers의 형태로 받을 수 있다.
+  - 지정된 id 객체를 찾아서 해당 객체 삭제(SELECT -> DELETE)
+    - 만약 찾을 수 없는 경우 `ActiveRecord::RecordNotFound` 에러 발생
+  - delete 메서드는 바로 DELETE 실행
+- destroy!
+- destroy_all
+  - 각 레코드를 인스턴스화하고 destroy 메서드를 호출하여 조건과 일치하는 레코드를 삭제
+  - 한 번에 많은 레코드를 제거하는 경우 각 레코드의 인스턴스화, 콜백 실행 및 삭제에 많은 시간이 소요될 수 있다.
+  - 연결이나 콜백에 관계없이 많은 행을 빠르게 삭제하려면 대신 `delete_all`을 사용한다.
+  ```rb
+  Person.destroy_all("last_login < '2023-04-23'")
+  Person.destory_all(:status => "inactive")
+  Person.where(:age => 0..18).destroy_all
+  ```
+- destroy_by(*args)
+  - 지정된 조건과 일치하는 모든 레코드를 찾아 삭제한다.
+  - 삭제된 객체의 컬렉션을 반환한다.
+  - 레코드를 찾을 수 없다면, 빈 배열을 반환한다.
+  ```rb
+  Person.destroy_by(id: 13)
+  Person.destroy_by(name: 'Spartacus', rating: 4)
+  Person.destroy_by("published_at < ?", 2.weeks.ago)
+  ```
+- save
+  - 모델을 저장한다. 만약 모델이 새 것이면 레코드가 데이터베이스에 생성되고, 그렇지 않으면 기존 레코드가 업데이트된다.
+  - 기본적으로 저장할 때 유효성 검사를 실행한다.
+    - 만약 하나라도 실패하면 작업이 취소되고 저장이 false를 반환하며 레코드는 저장되지 않는다.
+    - 하지만 `validate: false`를 제공하면 유효성 검사가 모두 패스되기 때문에 가급적 사용하지 않는 것이 좋다.
+  - `update_at`도 현재 시간으로 설정하지만 `touch: false` 옵션을 설정하여 제공하면 timestamp는 업데이트되지 않는다.
+- save!
+- save(validate: false)
+- toggle(attribute)
+  - 현재 boolean 속성의 반대 속성을 할당한다.
+    - true -> false, false -> true
+  - 이 메서드는 설정자를 호출하지 않고 기본값을 직접 전환하고, 자신을 반환한다.
+  ```rb
+  user = User.first
+  user.banned? # false
+  user.toggle(:banned)
+  user.banned? # true
+  ```
+- toggle!
+- touch(*names, time:nil)
+  ```rb
+  product.touch # updated_at을 현재 시간으로 업데이트
+  product.touch(time: Time.new(2023, 4, 20, 0, 0, 0)) # udpated_at을 특정 시간으로 업데이트
+  product.touch(:designed_at) # designed_at과 updated_at 업데이트
+  product.touch(:started_at, :end_at) # started_at, end_at, updated_at 업데이트
+  ```
+  - updated_at 특성을 현재 시간 또는 지정된 시간으로 설정된 레코드로 저장할 수 있다.
+  - 이 메서드는 속성 이름과 옵션인 시간 인수를 전달할 수 있다.
+  - 특성 이름이 전달되면 updated_at 속성과 함께 업데이트된다.
+  - 시간 인수를 전달하지 않으면 현재 시간을 기본값으로 사용한다.
+- update_attribute(name, value)
+  - 단일 특성을 업데이트하고 레코드를 저장한다.
+  - 하지만 유효성 검사를 건너뛴다.
+- update(id = :all, attributes)
+  ```rb
+  # 단일 레코드 업데이트
+  Person.update(15, user_name: "Samuel", group: "expert")
+
+  # 복수 레코드 업데이트
+  people = { 1 => { "first_name" => "David" }, 2 => { "first_name" => "Jeremy" }}
+  Person.update(people.keys, people.values)
+
+  # Relation 결과로부터 복수 레코드 업데이트
+  people = Person.where(group: "expert")
+  people.update(group: "masters") 
+  ```
+- update!
+
+### after_find callbacks
+
+- all
+  - 모든 레코드를 반환한다.
+- first(limit = nil)
+  ```rb
+  class Person < ActiveRecord::Base
+    has_many :pets
+  end
+
+  person.pets
+  # => [
+  #       #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>,
+  #       #<Pet id: 2, name: "Spook", person_id: 1>,
+  #       #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+  #    ]
+
+  person.pets.first # => #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>
+
+  person.pets.first(2)
+  # => [
+  #      #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>,
+  #      #<Pet id: 2, name: "Spook", person_id: 1>
+  #    ]
+  ```
+  - 첫 번째 레코드 또는 첫 번째에서 n개의 레코드를 반환한다.
+- find(*args)
+    ```rb
+  class Person < ActiveRecord::Base
+    has_many :pets
+  end
+
+  person.pets
+  # => [
+  #       #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>,
+  #       #<Pet id: 2, name: "Spook", person_id: 1>,
+  #       #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+  #    ]
+
+  person.pets.find(1) #  #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>
+  person.pets.find(4) # ActiveRecord::RecordNotFound: Couldn't find Pet with 'id'=4
+
+  person.pets.find(2) { |pet| pet.name.downcase! }
+  # #<Pet id: 2, name: "fancy-fancy", person_id: 1>
+
+  person.pets.find(2, 3)
+  #  [
+  #     #<Pet id: 2, name: "Spook", person_id: 1>,
+  #     #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+  #   ]
+  ```
+  - id에 맞는 객체를 찾는다.
+  - 객체를 찾을 수 없는 경우 RecordNotFound 에러 발생한다.
+- find_by
+  ```rb
+  Post.find_by(name: 'Spartacus', rating: 4)
+  Post.find_by("published_at < ?", 2.weeks.ago)
+  ```
+  - 지정된 조건에 맞는 첫 번째 레코드를 반환한다.
+  - 레코드를 찾을 수 없는 경우 `nil`을 반환한다.
+- count_by_sql
+  ```rb
+  # 12
+  Product.count_by_sql "SELECT COUNT(*) FROM sales s, customers c WHERE s.customer_id = c.id"
+  ```
+  - SELECT 부분에 COUNT(*)만 포함해야 하는 SQL 문의 결과를 반환한다.
+  - `ActiveRecord::Calculations`의 클래스 메서드를 사용한다.
+- find_by_sql
+  ```rb
+  Post.find_by_sql "SELECT p.title, c.author FROM posts p, comments c WHERE p.id = c.post_id"
+  # [#<Post:0x36bff9c @attributes={"title"=>"Ruby Meetup", "author"=>"Quentin"}>, ...]
+
+  Post.find_by_sql ["SELECT title FROM posts WHERE author = ? AND created > ?", author_id, start_date]
+  Post.find_by_sql ["SELECT body FROM comments WHERE author = :user_id OR approved_by = :user_id", { :user_id => user_id }]
+  ```
+  - 데이터베이스에 대해 사용자 지정 SQL을 실행하고 모든 결과를 반환한다.
+  - 결과는 배열로 반환되고 해당 모델의 객체가 요소로 저장된다.
+- last
+  ```rb
+  class Person < ActiveRecord::Base
+    has_many :pets
+  end
+
+  person.pets
+  # => [
+  #       #<Pet id: 1, name: "Fancy-Fancy", person_id: 1>,
+  #       #<Pet id: 2, name: "Spook", person_id: 1>,
+  #       #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+  #    ]
+
+  person.pets.last # => #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+
+  person.pets.last(2)
+  # => [
+  #      #<Pet id: 2, name: "Spook", person_id: 1>,
+  #      #<Pet id: 3, name: "Choo-Choo", person_id: 1>
+  #    ]
+  ```
+  - 마지막 레코드 또는 마지막에서 `n`개의 레코드를 반환한다.
+
+
+### 주의해야할 callback
+
+- delete
+  - destroy와는 다르게 SELECT 조회하지 않고 바로 DELETE
+  - 별도 에러가 발생하지 않고 만약 해당 객체가 삭제되면 1을 삭제되지 않으면 0을 반환
+- delete_all
+- delete_by
+  ```rb
+  Person.delete_by(id: 13)
+  Person.delete_by(name: 'Spartacus', rating: 4)
+  Person.delete_by("published_at < ?", 2.weeks.ago)
+  ```
+  - 지정한 조건에 맞는 모든 레코드들을 찾아 삭제한다.
+  - 삭제된 레코드의 수를 반환한다.
+- insert
+- insert!
+- insert_all
+  ```rb
+  Book.insert_all([
+    { id: 1, title: "Rework", author: "David" },
+    { id: 1, title: "Eloquent Ruby", author: "Russ" } # id가 중복되기 때문에 "Eloquent Ruby"는 생략된다.
+  ])
+  ```
+  - SQL `INSERT` 문에서 복수 레코드를 삽입할 수 있다.
+- insert_all!
+- update_column
+- update_columns
+- update_all
+- upate_counters
+- upsert
+  - 단일 SQL INSERT 문에서 단일 레코드를 데이터베이스에 업데이트하거나 삽입한다
+  - 모델을 따로 인스턴스화하거나 유효성 검사를 트리거하지 않는다.
+- upsert_all
+
 ## ActiveRecord Query Interface
 
 ```rb
@@ -676,12 +917,21 @@ Client.where(:orders_count => [1, 3, 5])
 
 - `IN` 표현식을 사용하여 레코드를 찾으려면 조건 해시에 배열을 전달할 수 있다.
 
-### 특정 분야 선택
+### Ordering
+
+```rb
+Client.order("create DESC, orders_count ASC")
+```
+
+### 특정 필드 선택
 
 ```rb
 # SELECT viewable_by, locked FROM clients
 Client.select("viewable_by, locked")
 Client.select("DISTINCT(name)")
+
+Client.select(:viewable_by, :locked)
+Client.select(:name).distinct # SELECT DISTINCT name FROM Client
 ```
 
 - DISTINCT 함수를 사용하여 특정 필드의 고유값당 단일 레코드만 가져오려는 경우에 사용할 수 있다.
@@ -689,8 +939,37 @@ Client.select("DISTINCT(name)")
 ### 제한 및 오프셋
 
 ```rb
+# SELECT * FROM clients LIMIT 5 OFFSET 30
+# SELECT * FROM clients LIMIT 5, 30
 Client.limit(5).offset(30)
 ```
 
 - 최대 5개의 30개 넘김
+- LIMIT 숫자: 출력할행의 수
+- OFFSET 숫자: 몇 번째 row부터 출력할 지 (1번째 row면 0)
 
+### Group
+
+```rb
+# SELECT DATE(created_at) FROM orders GROUP BY DATE(created_at) ORDER BY created_at
+Order.select("date(created_at)").group("date(created_at)").order("created_at")
+```
+
+### Having
+
+```rb
+# SELECT DATE(created_at) FROM orders GROUP BY DATE(created_at) HAVING (DATE(created_at) > '2023-03-20 13;46:07.242412')
+Order.select("date(created_at)").group("date(created_at)").having("date(created_at) > ?", 1.month.ago)
+```
+
+```rb
+# SELECT DATE(created_at), sum(cost_amount) AS total_price FROM "orders" GROUP BY DATE(created_at) HAVING (sum(cost_amount) > 50000);
+Order.select("DATE(created_at), sum(cost_amount) AS total_price").group("DATE(created_at)").having("sum(cost_amount) > 50000")
+```
+
+### Joining Tables
+
+```rb
+# SELECT "sponsorship_sales".* FROM "sponsorship_sales" INNER JOIN "sponsorship_sale_details" ON "sponsorship_sale_details"."sponsorship_sale_id" = "sponsorship_sales"."id"
+Sp.joins(:sp_details)
+```
